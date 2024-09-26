@@ -1,6 +1,0 @@
-Flask==2.0.2
-Flask-Cors==3.0.10
-qdrant-client
-requests
-python-dotenv
-pip freeze > requirements.txt
