@@ -39,7 +39,7 @@ def gerar_resposta_llama(query, contexto):
             #     "content": "Você é um agente da area da saúde"
             #  },
             {
-                "role": "user",
+                "role": "system",
                 "content": f"Contexto: {contexto}"  # Contexto extraído do Qdrant
             },
             {
