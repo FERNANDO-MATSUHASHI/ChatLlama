@@ -40,7 +40,7 @@ def gerar_resposta_llama(query, contexto):
             #  },
             {
                 "role": "system",
-                "content": f"Contexto: {contexto}"  # Contexto extraído do Qdrant
+                "content": f"Responda apenas referente: {contexto}. Não responda nada além disso."  # Contexto extraído do Qdrant
             },
             {
                 "role": "user",
