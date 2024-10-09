@@ -4,13 +4,12 @@ import requests
 import json
 from dotenv import load_dotenv
 import os
-
-from flask_cors import CORS  # Importa CORS
-from langchain.memory import ConversationBufferMemory  # Importando memória do LangChain
+import uuid
+from flask_cors import CORS
+from langchain.memory import ConversationBufferMemory
 
 app = Flask(__name__)
-CORS(app)  # Permite CORS para todas as rotas
-
+CORS(app)
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -26,8 +25,15 @@ qdrant_client = QdrantClient(
     api_key=apiQdrant
 )
 
-# Inicializando memória do LangChain
-memory = ConversationBufferMemory(memory_key="chat_history")
+# Dicionário para armazenar a memória de conversas por sessão
+sessions_memory = {}
+
+# Função para obter ou criar o histórico de uma sessão
+def get_session_memory(session_id: str) -> ConversationBufferMemory:
+    if session_id not in sessions_memory:
+        # Cria uma nova memória para a sessão se não existir
+        sessions_memory[session_id] = ConversationBufferMemory(memory_key="chat_history")
+    return sessions_memory[session_id]
 
 # Função para gerar resposta do LLaMA diretamente
 def gerar_resposta_llama(query, contexto, history):
@@ -38,10 +44,6 @@ def gerar_resposta_llama(query, contexto, history):
     data = {
         "model": "meta-llama/llama-3.1-8b-instruct:free",  # Modelo a ser utilizado
         "messages": [
-            # {
-            #     "role": "system", 
-            #     "content": "Você é um agente da area da saúde"
-            #  },
             {
                 "role": "system",
                 "content": f"Responda apenas referente: {contexto}. Não responda nada além disso."  # Contexto extraído do Qdrant
@@ -71,7 +73,7 @@ def gerar_resposta_llama(query, contexto, history):
 # Função para buscar o contexto no Qdrant baseado nos embeddings
 def buscar_contexto_qdrant(query_embedding):
     search_result = qdrant_client.search(
-        collection_name="Teste_Boock",  # Substitua pelo nome da sua coleção no Qdrant
+        collection_name="iClinicBot",  # Substitua pelo nome da sua coleção no Qdrant
         query_vector=query_embedding,
         limit=3  # Limite de documentos mais próximos
     )
@@ -84,12 +86,20 @@ def buscar_contexto_qdrant(query_embedding):
 def chat():
     data = request.json
     pergunta = data.get("mensagem_usuario")
-    
+    session_id = data.get("session_id")  # Identificador único para a sessão
+
+    # Verificar se o session_id foi fornecido, caso contrário, gerar um novo
+    if not session_id:
+        session_id = str(uuid.uuid4())  # Gera um UUID para a nova sessão
+
     if not pergunta:
         return jsonify({"error": "Pergunta não fornecida"}), 400
+
+    # Obter a memória da sessão atual
+    memory = get_session_memory(session_id)
     
     # Para esta versão ajustada, vamos usar um contexto genérico por enquanto
-    contexto = "Você é um agente da area da saúde"
+    contexto = "Você é um agente da área da saúde"
     
     # Carregar o histórico da memória
     history = memory.load_memory_variables({}).get('chat_history', '')
@@ -102,11 +112,11 @@ def chat():
         memory.chat_memory.add_user_message(pergunta)
         memory.chat_memory.add_ai_message(resposta)
 
-        return jsonify({"resposta": resposta}), 200
+        return jsonify({"resposta": resposta, "session_id": session_id}), 200
     else:
         return jsonify({"error": "Não foi possível gerar uma resposta."}), 500
 
 # Executa a aplicação Flask
 if __name__ == '__main__':
-    # app.run(host='0.0.0.0', port=5000, debug=True)
-    app.run(host=hostRender, port=portRender, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
+    # app.run(host=hostRender, port=portRender, debug=True)
